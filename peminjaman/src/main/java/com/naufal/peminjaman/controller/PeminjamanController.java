@@ -15,15 +15,28 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.naufal.peminjaman.application.QueryHandler;
+import com.naufal.peminjaman.application.commands.CreatePeminjamanCommand;
+import com.naufal.peminjaman.application.commands.CreatePeminjamanHandler;
+import com.naufal.peminjaman.application.commands.DeletePeminjamanCommand;
+import com.naufal.peminjaman.application.commands.DeletePeminjamanHandler;
+import com.naufal.peminjaman.application.commands.UpdatePeminjamanCommand;
+import com.naufal.peminjaman.application.commands.UpdatePeminjamanHandler;
+import com.naufal.peminjaman.application.queries.GetAllPeminjamanQuery;
+import com.naufal.peminjaman.application.queries.GetPeminjamanByAnggotaIdQuery;
+import com.naufal.peminjaman.application.queries.GetPeminjamanByIdQuery;
+import com.naufal.peminjaman.application.queries.GetPeminjamanWithDetailsQuery;
 import com.naufal.peminjaman.dto.CommandResult;
+import com.naufal.peminjaman.dto.PeminjamanDTO;
 import com.naufal.peminjaman.model.PeminjamanModel;
-import com.naufal.peminjaman.service.PeminjamanService;
 import com.naufal.peminjaman.vo.ResponseTemplate;
 
 import static net.logstash.logback.argument.StructuredArguments.kv;
 
 /**
- * Standard REST Controller (Refactored from CQRS)
+ * CQRS-compliant Controller with Structured Logging
+ * - Commands return CommandResult (ID + status)
+ * - Queries return DTOs (not raw entities)
  */
 @RestController
 @RequestMapping("/api/peminjaman")
@@ -31,96 +44,109 @@ public class PeminjamanController {
 
     private static final Logger log = LoggerFactory.getLogger(PeminjamanController.class);
 
+    // Command Handlers (Write operations)
     @Autowired
-    private PeminjamanService peminjamanService;
+    private CreatePeminjamanHandler createHandler;
 
-    // ==================== READ OPERATIONS ====================
+    @Autowired
+    private UpdatePeminjamanHandler updateHandler;
+
+    @Autowired
+    private DeletePeminjamanHandler deleteHandler;
+
+    // Query Handlers (Read operations)
+    @Autowired
+    private QueryHandler<GetAllPeminjamanQuery, List<PeminjamanDTO>> getAllHandler;
+
+    @Autowired
+    private QueryHandler<GetPeminjamanByIdQuery, PeminjamanDTO> getByIdHandler;
+
+    @Autowired
+    private QueryHandler<GetPeminjamanByAnggotaIdQuery, List<PeminjamanDTO>> getByAnggotaIdHandler;
+
+    @Autowired
+    private QueryHandler<GetPeminjamanWithDetailsQuery, List<ResponseTemplate>> getWithDetailsHandler;
+
+    // ==================== QUERIES (Read) ====================
 
     @GetMapping
-    public List<PeminjamanModel> getAllPeminjaman() {
-        log.info("Request received", kv("action", "GET_ALL"));
-        List<PeminjamanModel> result = peminjamanService.getAllPeminjaman();
-        log.info("Request completed", kv("action", "GET_ALL"), kv("status", "SUCCESS"), kv("count", result.size()));
+    public List<PeminjamanDTO> getAllPeminjaman() {
+        log.info("Query received", kv("action", "GET_ALL"), kv("type", "QUERY"));
+        List<PeminjamanDTO> result = getAllHandler.handle(new GetAllPeminjamanQuery());
+        log.info("Query completed", kv("action", "GET_ALL"), kv("status", "SUCCESS"), kv("count", result.size()));
         return result;
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<PeminjamanModel> getPeminjamanById(@PathVariable Long id) {
-        log.info("Request received", kv("action", "GET_BY_ID"), kv("id", id));
-        PeminjamanModel peminjaman = peminjamanService.getPeminjamanById(id);
+    public ResponseEntity<PeminjamanDTO> getPeminjamanById(@PathVariable Long id) {
+        log.info("Query received", kv("action", "GET_BY_ID"), kv("type", "QUERY"), kv("id", id));
+        PeminjamanDTO peminjaman = getByIdHandler.handle(new GetPeminjamanByIdQuery(id));
         if (peminjaman != null) {
-            log.info("Request completed", kv("action", "GET_BY_ID"), kv("status", "SUCCESS"), kv("id", id));
+            log.info("Query completed", kv("action", "GET_BY_ID"), kv("status", "SUCCESS"), kv("id", id));
             return ResponseEntity.ok(peminjaman);
         } else {
-            log.warn("Request completed", kv("action", "GET_BY_ID"), kv("status", "NOT_FOUND"), kv("id", id));
+            log.warn("Query completed", kv("action", "GET_BY_ID"), kv("status", "NOT_FOUND"), kv("id", id));
             return ResponseEntity.notFound().build();
         }
     }
 
     @GetMapping(path = "/anggota/{id}")
     public List<ResponseTemplate> getPeminjamanWithAnggotaById(@PathVariable Long id) {
-        log.info("Request received", kv("action", "GET_WITH_DETAILS"), kv("peminjamanId", id));
-        List<ResponseTemplate> result = peminjamanService.getPeminjamanWithAnggotaById(id);
-        log.info("Request completed", kv("action", "GET_WITH_DETAILS"), kv("status", "SUCCESS"),
+        log.info("Query received", kv("action", "GET_WITH_DETAILS"), kv("type", "QUERY"), kv("peminjamanId", id));
+        List<ResponseTemplate> result = getWithDetailsHandler.handle(new GetPeminjamanWithDetailsQuery(id));
+        log.info("Query completed", kv("action", "GET_WITH_DETAILS"), kv("status", "SUCCESS"),
                 kv("count", result.size()));
         return result;
     }
 
     @GetMapping(path = "/by-anggota/{anggotaId}")
-    public ResponseEntity<List<PeminjamanModel>> getPeminjamanByAnggotaId(@PathVariable Long anggotaId) {
-        log.info("Request received", kv("action", "GET_BY_ANGGOTA_ID"), kv("anggotaId", anggotaId));
-        List<PeminjamanModel> peminjamanList = peminjamanService.getPeminjamanByAnggotaId(anggotaId);
+    public ResponseEntity<List<PeminjamanDTO>> getPeminjamanByAnggotaId(@PathVariable Long anggotaId) {
+        log.info("Query received", kv("action", "GET_BY_ANGGOTA_ID"), kv("type", "QUERY"), kv("anggotaId", anggotaId));
+        List<PeminjamanDTO> peminjamanList = getByAnggotaIdHandler.handle(
+                new GetPeminjamanByAnggotaIdQuery(anggotaId));
         if (peminjamanList.isEmpty()) {
-            log.warn("Request completed", kv("action", "GET_BY_ANGGOTA_ID"), kv("status", "NOT_FOUND"),
+            log.warn("Query completed", kv("action", "GET_BY_ANGGOTA_ID"), kv("status", "NOT_FOUND"),
                     kv("anggotaId", anggotaId));
             return ResponseEntity.notFound().build();
         }
-        log.info("Request completed", kv("action", "GET_BY_ANGGOTA_ID"), kv("status", "SUCCESS"),
+        log.info("Query completed", kv("action", "GET_BY_ANGGOTA_ID"), kv("status", "SUCCESS"),
                 kv("count", peminjamanList.size()));
         return ResponseEntity.ok(peminjamanList);
     }
 
-    // ==================== WRITE OPERATIONS ====================
+    // ==================== COMMANDS (Write) ====================
 
     @PostMapping
     public ResponseEntity<CommandResult> createPeminjaman(@RequestBody PeminjamanModel peminjaman) {
-        log.info("Request received", kv("action", "CREATE"),
+        log.info("Command received", kv("action", "CREATE"), kv("type", "COMMAND"),
                 kv("anggotaId", peminjaman.getAnggotaId()), kv("bukuId", peminjaman.getBukuId()));
-        
-        try {
-            PeminjamanModel result = peminjamanService.createPeminjaman(peminjaman);
-            CommandResult commandResult = new CommandResult(result.getId(), true, "Peminjaman created successfully");
-            
-            log.info("Request completed", kv("action", "CREATE"), kv("status", "SUCCESS"), kv("id", result.getId()));
-            return ResponseEntity.status(201).body(commandResult);
-        } catch (Exception e) {
-            log.error("Request failed", kv("action", "CREATE"), kv("status", "FAILED"), kv("error", e.getMessage()));
-            return ResponseEntity.badRequest().body(new CommandResult(null, false, e.getMessage()));
+        CommandResult result = createHandler.handle(new CreatePeminjamanCommand(peminjaman));
+        if (result.isSuccess()) {
+            log.info("Command completed", kv("action", "CREATE"), kv("status", "SUCCESS"), kv("id", result.getId()));
+            return ResponseEntity.status(201).body(result);
         }
+        log.error("Command failed", kv("action", "CREATE"), kv("status", "FAILED"), kv("error", result.getMessage()));
+        return ResponseEntity.badRequest().body(result);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<CommandResult> updatePeminjaman(@PathVariable Long id,
             @RequestBody PeminjamanModel peminjaman) {
-        log.info("Request received", kv("action", "UPDATE"), kv("id", id));
-        
-        PeminjamanModel result = peminjamanService.updatePeminjaman(id, peminjaman);
-        if (result != null) {
-            log.info("Request completed", kv("action", "UPDATE"), kv("status", "SUCCESS"), kv("id", id));
-            return ResponseEntity.ok(new CommandResult(id, true, "Peminjaman updated successfully"));
+        log.info("Command received", kv("action", "UPDATE"), kv("type", "COMMAND"), kv("id", id));
+        CommandResult result = updateHandler.handle(new UpdatePeminjamanCommand(id, peminjaman));
+        if (result != null && result.isSuccess()) {
+            log.info("Command completed", kv("action", "UPDATE"), kv("status", "SUCCESS"), kv("id", id));
+            return ResponseEntity.ok(result);
         }
-        
-        log.warn("Request completed", kv("action", "UPDATE"), kv("status", "NOT_FOUND"), kv("id", id));
+        log.warn("Command completed", kv("action", "UPDATE"), kv("status", "NOT_FOUND"), kv("id", id));
         return ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<CommandResult> deletePeminjaman(@PathVariable Long id) {
-        log.info("Request received", kv("action", "DELETE"), kv("id", id));
-        peminjamanService.deletePeminjaman(id);
-        
-        // Assuming delete is always successful if no exception
-        log.info("Request completed", kv("action", "DELETE"), kv("status", "SUCCESS"), kv("id", id));
-        return ResponseEntity.ok(new CommandResult(id, true, "Peminjaman deleted successfully"));
+        log.info("Command received", kv("action", "DELETE"), kv("type", "COMMAND"), kv("id", id));
+        CommandResult result = deleteHandler.handle(new DeletePeminjamanCommand(id));
+        log.info("Command completed", kv("action", "DELETE"), kv("status", "SUCCESS"), kv("id", id));
+        return ResponseEntity.ok(result);
     }
 }
