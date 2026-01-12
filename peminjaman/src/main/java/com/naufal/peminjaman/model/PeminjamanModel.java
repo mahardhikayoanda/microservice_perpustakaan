@@ -18,6 +18,7 @@ public class PeminjamanModel {
     private Long bukuId;
     private LocalDate tanggal_pinjam;
     private LocalDate tanggal_kembali;
+    private String status; // 'DIPINJAM', 'DIKEMBALIKAN'
 
     /**
      * Factory method for creating Peminjaman (Rich Domain Model pattern)
@@ -30,6 +31,7 @@ public class PeminjamanModel {
         peminjaman.setBukuId(bukuId);
         peminjaman.setTanggal_pinjam(tanggalPinjam);
         peminjaman.setTanggal_kembali(tanggalKembali);
+        peminjaman.setStatus("DIPINJAM");
         return peminjaman;
     }
 }
