@@ -1,6 +1,10 @@
 pipeline {
     agent any
     
+    tools {
+        jdk 'jdk21'
+    }
+
     options {
         timestamps()
         timeout(time: 30, unit: 'MINUTES')
@@ -8,12 +12,6 @@ pipeline {
     }
     
     environment {
-        // Kita gunakan path absolut untuk memastikan JAVA_HOME dan PATH benar
-        JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
-        MAVEN_HOME = '/usr/share/maven'
-        // Memaksa bin Java 21 ada di urutan PERTAMA di PATH
-        PATH = "/usr/lib/jvm/java-21-openjdk-amd64/bin:/usr/share/maven/bin:${env.PATH}"
-        
         BUILD_VERSION = "${env.BUILD_NUMBER}"
         DOCKER_REGISTRY = 'localhost:5000'
         GIT_COMMIT_SHORT = "${GIT_COMMIT.take(7)}"
