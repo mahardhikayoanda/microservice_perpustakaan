@@ -317,9 +317,10 @@ services:
       - "50000:50000"
     environment:
       - JAVA_OPTS=-Xmx1024m -Xms512m
+      - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
       - jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:rw
     networks:
       - microservices-network
     restart: unless-stopped

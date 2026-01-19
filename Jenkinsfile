@@ -35,7 +35,7 @@ pipeline {
                     echo "Maven Version:"
                     mvn -version
                     echo "Docker Version:"
-                    docker --version
+                    sudo docker --version
                 '''
             }
         }
@@ -139,7 +139,7 @@ pipeline {
                 echo "========== 📦 Building Docker Images =========="
                 sh '''
                     echo "Building Docker images from docker-compose..."
-                    docker-compose build --no-cache
+                    sudo docker-compose build --no-cache
                 '''
             }
         }
@@ -152,14 +152,14 @@ pipeline {
                 echo "========== 🚀 Deployment Stage =========="
                 sh '''
                     echo "Stopping existing containers..."
-                    docker-compose down || true
+                    sudo docker-compose down || true
                     
                     echo "Starting new containers..."
-                    docker-compose up -d
+                    sudo docker-compose up -d
                     
                     sleep 10
                     echo "Containers status:"
-                    docker-compose ps
+                    sudo docker-compose ps
                 '''
             }
         }
@@ -189,7 +189,7 @@ pipeline {
     post {
         always {
             echo "========== 📊 Post Build Actions =========="
-            sh 'docker images | head -10'
+            sh 'sudo docker images | head -10'
             cleanWs()
         }
         
@@ -200,7 +200,7 @@ pipeline {
         
         failure {
             echo "❌ Pipeline failed!"
-            sh 'docker-compose logs || true'
+            sh 'sudo docker-compose logs || true'
         }
         
         unstable {

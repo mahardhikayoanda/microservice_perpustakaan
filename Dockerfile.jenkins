@@ -5,7 +5,7 @@ USER root
 
 # Install Maven and Docker CLI
 RUN apt-get update && \
-    apt-get install -y maven docker.io && \
+    apt-get install -y maven docker.io sudo && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -13,8 +13,14 @@ RUN apt-get update && \
 RUN curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && \
     chmod +x /usr/local/bin/docker-compose
 
-# Add jenkins user to docker group (docker group should already exist from docker.io installation)
-RUN usermod -aG docker jenkins
+# Add jenkins user to docker group and configure sudo
+RUN usermod -aG docker jenkins && \
+    mkdir -p /etc/sudoers.d && \
+    echo "jenkins ALL=(ALL) NOPASSWD: /usr/bin/docker, /usr/local/bin/docker-compose" > /etc/sudoers.d/jenkins && \
+    chmod 0440 /etc/sudoers.d/jenkins
+
+# Set up jenkins user with proper permissions
+RUN chown -R jenkins:jenkins /var/jenkins_home
 
 # Switch back to jenkins user
 USER jenkins
