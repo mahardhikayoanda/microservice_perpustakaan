@@ -7,6 +7,12 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
     
+    checkout([$class: 'GitSCM', 
+    branches: [[name: '*/main']], 
+    extensions: [[$class: 'CloneOption', depth: 1, shallow: true]], 
+    userRemoteConfigs: [[url: 'https://github.com/mahardhikayoanda/microservice_perpustakaan.git']]
+])
+
     environment {
         JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
         MAVEN_HOME = '/usr/share/maven'
