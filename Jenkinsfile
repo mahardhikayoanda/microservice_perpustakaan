@@ -7,13 +7,8 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
     
-    checkout([$class: 'GitSCM', 
-    branches: [[name: '*/main']], 
-    extensions: [[$class: 'CloneOption', depth: 1, shallow: true]], 
-    userRemoteConfigs: [[url: 'https://github.com/mahardhikayoanda/microservice_perpustakaan.git']]
-])
-
     environment {
+        // Sesuaikan path ini dengan hasil perintah 'echo $JAVA_HOME' di terminal server kamu jika berbeda
         JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
         MAVEN_HOME = '/usr/share/maven'
         PATH = "${env.MAVEN_HOME}/bin:${env.JAVA_HOME}/bin:${env.PATH}"
@@ -106,7 +101,7 @@ pipeline {
                     steps {
                         echo "========== 🧪 Testing Anggota Service =========="
                         dir('anggota') {
-                            sh 'mvn test -q || true'
+                            sh 'mvn test -q' 
                         }
                     }
                 }
@@ -115,7 +110,7 @@ pipeline {
                     steps {
                         echo "========== 🧪 Testing Buku Service =========="
                         dir('buku') {
-                            sh 'mvn test -q || true'
+                            sh 'mvn test -q'
                         }
                     }
                 }
@@ -124,7 +119,7 @@ pipeline {
                     steps {
                         echo "========== 🧪 Testing Peminjaman Service =========="
                         dir('peminjaman') {
-                            sh 'mvn test -q || true'
+                            sh 'mvn test -q'
                         }
                     }
                 }
@@ -133,7 +128,7 @@ pipeline {
                     steps {
                         echo "========== 🧪 Testing Pengembalian Service =========="
                         dir('pengembalian') {
-                            sh 'mvn test -q || true'
+                            sh 'mvn test -q'
                         }
                     }
                 }
@@ -143,6 +138,7 @@ pipeline {
         stage('📦 Build Docker Images') {
             steps {
                 echo "========== 📦 Building Docker Images =========="
+                // Pastikan permission docker.sock sudah diatur (sudo chmod 666 /var/run/docker.sock)
                 sh '''
                     echo "Building Docker images from docker-compose..."
                     sudo docker-compose build --no-cache
@@ -179,7 +175,8 @@ pipeline {
                 sh '''
                     echo "Checking service health..."
                     for i in {1..10}; do
-                        if curl -f http://localhost:8081/actuator/health; then
+                        # Cek port 8080 (API Gateway default) atau port lain yang sesuai
+                        if curl -f http://localhost:8080/actuator/health || curl -f http://localhost:8081/actuator/health; then
                             echo "✅ Services are healthy!"
                             exit 0
                         fi
@@ -201,16 +198,11 @@ pipeline {
         
         success {
             echo "✅ Pipeline succeeded!"
-            echo "Artifacts available in workspace"
         }
         
         failure {
             echo "❌ Pipeline failed!"
             sh 'sudo docker-compose logs || true'
-        }
-        
-        unstable {
-            echo "⚠️ Pipeline unstable - review logs"
         }
     }
 }
