@@ -23,7 +23,7 @@ public class BukuService {
     }
 
     public BukuModel createBuku(BukuModel buku) {
-        System.out.println("sukses dan berhasil ");
+        // System.out.println("sukses dan berhasil ");
         return BukuRepository.save(buku);
     }
 
