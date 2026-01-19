@@ -256,6 +256,8 @@ services:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
@@ -304,6 +306,27 @@ services:
     networks:
       - microservices-network
 
+  # CI/CD - Jenkins
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    environment:
+      - JAVA_OPTS=-Xmx1024m -Xms512m
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   anggota_data:
   buku_data:
@@ -312,6 +335,7 @@ volumes:
   elasticsearch_data:
   prometheus_data:
   grafana_data:
+  jenkins_home:
 
 networks:
   microservices-network:

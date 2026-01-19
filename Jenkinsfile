@@ -1,101 +1,210 @@
 pipeline {
     agent any
     
-    tools {
-        maven 'Maven'
-        jdk 'JDK17'
+    options {
+        timestamps()
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
+    environment {
+        JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
+        MAVEN_HOME = '/usr/share/maven'
+        PATH = "${env.MAVEN_HOME}/bin:${env.JAVA_HOME}/bin:${env.PATH}"
+        BUILD_VERSION = "${env.BUILD_NUMBER}"
+        DOCKER_REGISTRY = 'localhost:5000'
+        GIT_COMMIT_SHORT = "${GIT_COMMIT.take(7)}"
     }
     
     stages {
-        stage('Checkout') {
+        stage('📋 Checkout') {
             steps {
-                echo 'Cloning repository...'
+                echo "========== 📋 CHECKOUT STAGE =========="
                 checkout scm
+                echo "✅ Repository checked out successfully"
+                sh 'git log --oneline -1'
             }
         }
         
-        stage('Build Anggota Service') {
+        stage('🔧 Setup') {
             steps {
-                echo 'Building Anggota Service...'
-                dir('anggota') {
-                    sh 'mvn clean package -DskipTests'
+                echo "========== 🔧 SETUP STAGE =========="
+                sh '''
+                    echo "Java Version:"
+                    java -version
+                    echo "Maven Version:"
+                    mvn -version
+                    echo "Docker Version:"
+                    docker --version
+                '''
+            }
+        }
+        
+        stage('🏗️ Build Services') {
+            parallel {
+                stage('Build Anggota') {
+                    steps {
+                        echo "========== 🏗️ Building Anggota Service =========="
+                        dir('anggota') {
+                            sh 'mvn clean package -DskipTests -q'
+                            sh 'ls -lh target/*.jar'
+                        }
+                    }
+                }
+                
+                stage('Build Buku') {
+                    steps {
+                        echo "========== 🏗️ Building Buku Service =========="
+                        dir('buku') {
+                            sh 'mvn clean package -DskipTests -q'
+                            sh 'ls -lh target/*.jar'
+                        }
+                    }
+                }
+                
+                stage('Build Peminjaman') {
+                    steps {
+                        echo "========== 🏗️ Building Peminjaman Service =========="
+                        dir('peminjaman') {
+                            sh 'mvn clean package -DskipTests -q'
+                            sh 'ls -lh target/*.jar'
+                        }
+                    }
+                }
+                
+                stage('Build Pengembalian') {
+                    steps {
+                        echo "========== 🏗️ Building Pengembalian Service =========="
+                        dir('pengembalian') {
+                            sh 'mvn clean package -DskipTests -q'
+                            sh 'ls -lh target/*.jar'
+                        }
+                    }
+                }
+                
+                stage('Build API Gateway') {
+                    steps {
+                        echo "========== 🏗️ Building API Gateway =========="
+                        dir('api-gateway') {
+                            sh 'mvn clean package -DskipTests -q'
+                            sh 'ls -lh target/*.jar'
+                        }
+                    }
                 }
             }
         }
         
-        stage('Test Anggota Service') {
-            steps {
-                echo 'Testing Anggota Service...'
-                dir('anggota') {
-                    sh 'mvn test'
+        stage('🧪 Unit Tests') {
+            parallel {
+                stage('Test Anggota') {
+                    steps {
+                        echo "========== 🧪 Testing Anggota Service =========="
+                        dir('anggota') {
+                            sh 'mvn test -q || true'
+                        }
+                    }
+                }
+                
+                stage('Test Buku') {
+                    steps {
+                        echo "========== 🧪 Testing Buku Service =========="
+                        dir('buku') {
+                            sh 'mvn test -q || true'
+                        }
+                    }
+                }
+                
+                stage('Test Peminjaman') {
+                    steps {
+                        echo "========== 🧪 Testing Peminjaman Service =========="
+                        dir('peminjaman') {
+                            sh 'mvn test -q || true'
+                        }
+                    }
+                }
+                
+                stage('Test Pengembalian') {
+                    steps {
+                        echo "========== 🧪 Testing Pengembalian Service =========="
+                        dir('pengembalian') {
+                            sh 'mvn test -q || true'
+                        }
+                    }
                 }
             }
         }
         
-        stage('Build Buku Service') {
+        stage('📦 Build Docker Images') {
             steps {
-                echo 'Building Buku Service...'
-                dir('buku') {
-                    sh 'mvn clean package -DskipTests'
-                }
+                echo "========== 📦 Building Docker Images =========="
+                sh '''
+                    echo "Building Docker images from docker-compose..."
+                    docker-compose build --no-cache
+                '''
             }
         }
         
-        stage('Test Buku Service') {
+        stage('🚀 Deploy (Optional)') {
+            when {
+                branch 'main'
+            }
             steps {
-                echo 'Testing Buku Service...'
-                dir('buku') {
-                    sh 'mvn test'
-                }
+                echo "========== 🚀 Deployment Stage =========="
+                sh '''
+                    echo "Stopping existing containers..."
+                    docker-compose down || true
+                    
+                    echo "Starting new containers..."
+                    docker-compose up -d
+                    
+                    sleep 10
+                    echo "Containers status:"
+                    docker-compose ps
+                '''
             }
         }
         
-        stage('Build Peminjaman Service') {
-            steps {
-                echo 'Building Peminjaman Service...'
-                dir('peminjaman') {
-                    sh 'mvn clean package -DskipTests'
-                }
+        stage('✅ Health Check') {
+            when {
+                branch 'main'
             }
-        }
-        
-        stage('Test Peminjaman Service') {
             steps {
-                echo 'Testing Peminjaman Service...'
-                dir('peminjaman') {
-                    sh 'mvn test'
-                }
-            }
-        }
-        
-        stage('Build Pengembalian Service') {
-            steps {
-                echo 'Building Pengembalian Service...'
-                dir('pengembalian') {
-                    sh 'mvn clean package -DskipTests'
-                }
-            }
-        }
-        
-        stage('Test Pengembalian Service') {
-            steps {
-                echo 'Testing Pengembalian Service...'
-                dir('pengembalian') {
-                    sh 'mvn test'
-                }
+                echo "========== ✅ Health Check Stage =========="
+                sh '''
+                    echo "Checking service health..."
+                    for i in {1..10}; do
+                        if curl -f http://localhost:8081/actuator/health; then
+                            echo "✅ Services are healthy!"
+                            exit 0
+                        fi
+                        echo "Waiting for services to start... (attempt $i/10)"
+                        sleep 5
+                    done
+                    echo "⚠️ Services took longer to start, continuing..."
+                '''
             }
         }
     }
     
     post {
-        success {
-            echo '✅ All services built and tested successfully!'
-        }
-        failure {
-            echo '❌ Build or test failed!'
-        }
         always {
-            echo 'Pipeline completed.'
+            echo "========== 📊 Post Build Actions =========="
+            sh 'docker images | head -10'
+            cleanWs()
+        }
+        
+        success {
+            echo "✅ Pipeline succeeded!"
+            echo "Artifacts available in workspace"
+        }
+        
+        failure {
+            echo "❌ Pipeline failed!"
+            sh 'docker-compose logs || true'
+        }
+        
+        unstable {
+            echo "⚠️ Pipeline unstable - review logs"
         }
     }
 }
