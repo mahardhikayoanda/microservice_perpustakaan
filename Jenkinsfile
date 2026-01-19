@@ -7,15 +7,15 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
     
-    // NOTE: We use environment variables instead of Jenkins tools configuration
-    // because all required tools (Java 21, Maven 3.9.9, Docker) are pre-installed
-    // in the custom Jenkins Docker container (see Dockerfile.jenkins)
-    
     environment {
+        // Kita gunakan path absolut untuk memastikan JAVA_HOME dan PATH benar
         JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
         MAVEN_HOME = '/usr/share/maven'
-        PATH = "${env.MAVEN_HOME}/bin:${env.JAVA_HOME}/bin:${env.PATH}"
+        // Memaksa bin Java 21 ada di urutan PERTAMA di PATH
+        PATH = "/usr/lib/jvm/java-21-openjdk-amd64/bin:/usr/share/maven/bin:${env.PATH}"
+        
         BUILD_VERSION = "${env.BUILD_NUMBER}"
+        DOCKER_REGISTRY = 'localhost:5000'
         GIT_COMMIT_SHORT = "${GIT_COMMIT.take(7)}"
     }
     
@@ -23,7 +23,11 @@ pipeline {
         stage('📋 Checkout') {
             steps {
                 echo "========== 📋 CHECKOUT STAGE =========="
-                checkout scm
+                checkout([$class: 'GitSCM', 
+                    branches: [[name: '*/main']], 
+                    extensions: [[$class: 'CloneOption', depth: 1, shallow: true]], 
+                    userRemoteConfigs: [[url: 'https://github.com/mahardhikayoanda/microservice_perpustakaan.git']]
+                ])
                 echo "✅ Repository checked out successfully"
                 sh 'git log --oneline -1'
             }
@@ -33,12 +37,19 @@ pipeline {
             steps {
                 echo "========== 🔧 SETUP STAGE =========="
                 sh '''
-                    echo "Java Version:"
+                    echo "Checking Versions..."
+                    echo "--------------------"
+                    echo "Java Runtime (java):"
                     java -version
-                    echo "Maven Version:"
+                    echo "--------------------"
+                    echo "Java Compiler (javac):"
+                    javac -version
+                    echo "--------------------"
+                    echo "Maven:"
                     mvn -version
-                    echo "Docker Version:"
-                    sudo docker --version
+                    echo "--------------------"
+                    echo "Docker:"
+                    docker --version
                 '''
             }
         }
@@ -50,7 +61,7 @@ pipeline {
                         echo "========== 🏗️ Building Anggota Service =========="
                         dir('anggota') {
                             sh 'mvn clean package -DskipTests -q'
-                            sh 'ls -lh target/*.jar || echo "JAR not found"'
+                            sh 'ls -lh target/*.jar'
                         }
                     }
                 }
@@ -60,7 +71,7 @@ pipeline {
                         echo "========== 🏗️ Building Buku Service =========="
                         dir('buku') {
                             sh 'mvn clean package -DskipTests -q'
-                            sh 'ls -lh target/*.jar || echo "JAR not found"'
+                            sh 'ls -lh target/*.jar'
                         }
                     }
                 }
@@ -70,7 +81,7 @@ pipeline {
                         echo "========== 🏗️ Building Peminjaman Service =========="
                         dir('peminjaman') {
                             sh 'mvn clean package -DskipTests -q'
-                            sh 'ls -lh target/*.jar || echo "JAR not found"'
+                            sh 'ls -lh target/*.jar'
                         }
                     }
                 }
@@ -80,7 +91,7 @@ pipeline {
                         echo "========== 🏗️ Building Pengembalian Service =========="
                         dir('pengembalian') {
                             sh 'mvn clean package -DskipTests -q'
-                            sh 'ls -lh target/*.jar || echo "JAR not found"'
+                            sh 'ls -lh target/*.jar'
                         }
                     }
                 }
@@ -90,7 +101,7 @@ pipeline {
                         echo "========== 🏗️ Building API Gateway =========="
                         dir('api-gateway') {
                             sh 'mvn clean package -DskipTests -q'
-                            sh 'ls -lh target/*.jar || echo "JAR not found"'
+                            sh 'ls -lh target/*.jar'
                         }
                     }
                 }
@@ -103,7 +114,7 @@ pipeline {
                     steps {
                         echo "========== 🧪 Testing Anggota Service =========="
                         dir('anggota') {
-                            sh 'mvn test -q || echo "Tests skipped or failed, continuing..."'
+                            sh 'mvn test -q' 
                         }
                     }
                 }
@@ -112,7 +123,7 @@ pipeline {
                     steps {
                         echo "========== 🧪 Testing Buku Service =========="
                         dir('buku') {
-                            sh 'mvn test -q || echo "Tests skipped or failed, continuing..."'
+                            sh 'mvn test -q'
                         }
                     }
                 }
@@ -121,7 +132,7 @@ pipeline {
                     steps {
                         echo "========== 🧪 Testing Peminjaman Service =========="
                         dir('peminjaman') {
-                            sh 'mvn test -q || echo "Tests skipped or failed, continuing..."'
+                            sh 'mvn test -q'
                         }
                     }
                 }
@@ -130,7 +141,7 @@ pipeline {
                     steps {
                         echo "========== 🧪 Testing Pengembalian Service =========="
                         dir('pengembalian') {
-                            sh 'mvn test -q || echo "Tests skipped or failed, continuing..."'
+                            sh 'mvn test -q'
                         }
                     }
                 }
@@ -140,9 +151,10 @@ pipeline {
         stage('📦 Build Docker Images') {
             steps {
                 echo "========== 📦 Building Docker Images =========="
+                // Pastikan permission docker.sock sudah diatur (sudo chmod 666 /var/run/docker.sock)
                 sh '''
                     echo "Building Docker images from docker-compose..."
-                    sudo docker-compose build --no-cache || echo "Docker build complete with warnings"
+                    docker-compose build --no-cache
                 '''
             }
         }
@@ -155,14 +167,14 @@ pipeline {
                 echo "========== 🚀 Deployment Stage =========="
                 sh '''
                     echo "Stopping existing containers..."
-                    sudo docker-compose down || true
+                    docker-compose down || true
                     
                     echo "Starting new containers..."
-                    sudo docker-compose up -d
+                    docker-compose up -d
                     
                     sleep 10
                     echo "Containers status:"
-                    sudo docker-compose ps
+                    docker-compose ps
                 '''
             }
         }
@@ -176,7 +188,8 @@ pipeline {
                 sh '''
                     echo "Checking service health..."
                     for i in {1..10}; do
-                        if curl -f http://localhost:8081/actuator/health 2>/dev/null || curl -f http://localhost:8080/actuator/health 2>/dev/null; then
+                        # Cek port 8080 (API Gateway default) atau port lain yang sesuai
+                        if curl -f http://localhost:8080/actuator/health || curl -f http://localhost:8081/actuator/health; then
                             echo "✅ Services are healthy!"
                             exit 0
                         fi
@@ -192,22 +205,19 @@ pipeline {
     post {
         always {
             echo "========== 📊 Post Build Actions =========="
-            sh 'sudo docker images | head -10 || echo "Docker images listing failed"'
-            cleanWs()
+            sh 'docker images | head -10'
         }
         
         success {
             echo "✅ Pipeline succeeded!"
-            echo "Build version: ${env.BUILD_VERSION}"
+            // Pindahkan cleanWs ke sini agar log failure tidak terhapus jika gagal
+            cleanWs()
         }
         
         failure {
             echo "❌ Pipeline failed!"
-            sh 'sudo docker-compose logs || true'
-        }
-        
-        unstable {
-            echo "⚠️ Pipeline unstable - review logs"
+            // Log ini akan sukses muncul sekarang karena workspace belum dihapus
+            sh 'docker-compose logs || true'
         }
     }
 }
