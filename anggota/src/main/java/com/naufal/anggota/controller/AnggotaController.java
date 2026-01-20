@@ -42,7 +42,7 @@ public class AnggotaController {
         log.info("Request received", kv("action", "GET_BY_ID"), kv("id", id));
         AnggotaModel anggota = anggotaService.getAnggotaById(id);
         if (anggota != null) {
-            log.info("Request completed", kv("action", "GET_BY_ID"), kv("status", "SUCCESS"), kv("id", id));
+            log.info("Request completed", kv("action", "GET_BY_ID"), kv("status", "sukses"), kv("id", id));
             return ResponseEntity.ok(anggota);
         } else {
             log.warn("Request completed", kv("action", "GET_BY_ID"), kv("status", "NOT_FOUND"), kv("id", id));
