@@ -57,7 +57,7 @@ public class AnggotaController {
         
         AnggotaModel result = anggotaService.createAnggota(anggota);
         
-        log.info("Request completed", kv("action", "CREATE"), kv("status", "sukses"), kv("id", result.getId()));
+        log.info("Request completed", kv("action", "CREATE"), kv("status", "SUCCESS"), kv("id", result.getId()));
         return result;
     }
 
@@ -85,7 +85,7 @@ public class AnggotaController {
             // Opsional: Mencatat hasil akhir setelah update database
             log.info("Request completed", 
                 kv("action", "UPDATE"), 
-                kv("status", "SUCCESS"), 
+                kv("status", "sukses"), 
                 kv("id", id),
                 kv("result", updated)
             );
