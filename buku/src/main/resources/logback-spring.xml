@@ -5,7 +5,7 @@
     <springProperty scope="context" name="serviceName" source="spring.application.name" defaultValue="unknown"/>
 
     <!-- JSON Console Appender for ELK Stack -->
-    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
             <includeMdcKeyName>correlationId</includeMdcKeyName>
             <includeMdcKeyName>serviceName</includeMdcKeyName>
@@ -28,7 +28,7 @@
     <!-- Profile: ELK / Production - JSON output -->
     <springProfile name="elk,production">
         <root level="INFO">
-            <appender-ref ref="JSON_CONSOLE"/>
+            <appender-ref ref="LOGSTASH"/>
         </root>
         <logger name="com.naufal" level="DEBUG"/>
     </springProfile>
