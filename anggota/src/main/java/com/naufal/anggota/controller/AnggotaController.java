@@ -52,8 +52,11 @@ public class AnggotaController {
 
     @PostMapping
     public AnggotaModel creteAnggota(@RequestBody AnggotaModel anggota) {
-        log.info("Request received", kv("action", "CREATE"), kv("nama", anggota.getNama()));
+        // PERBAIKAN: Menambahkan payload agar data pembuatan terekam lengkap
+        log.info("Request received", kv("action", "CREATE"), kv("payload", anggota));
+        
         AnggotaModel result = anggotaService.createAnggota(anggota);
+        
         log.info("Request completed", kv("action", "CREATE"), kv("status", "SUCCESS"), kv("id", result.getId()));
         return result;
     }
@@ -68,10 +71,24 @@ public class AnggotaController {
 
     @PutMapping("/{id}")
     public ResponseEntity<AnggotaModel> updateAnggota(@PathVariable Long id, @RequestBody AnggotaModel anggota) {
-        log.info("Request received", kv("action", "UPDATE"), kv("id", id));
+        // PERBAIKAN UTAMA: Menambahkan 'kv("payload", anggota)'
+        // Ini akan mengirim JSON data anggota yang baru ke Logstash -> Elasticsearch
+        log.info("Request received", 
+            kv("action", "UPDATE"), 
+            kv("id", id), 
+            kv("payload", anggota)
+        );
+
         AnggotaModel updated = anggotaService.updateAnggota(id, anggota);
+        
         if (updated != null) {
-            log.info("Request completed", kv("action", "UPDATE"), kv("status", "SUCCESS"), kv("id", id));
+            // Opsional: Mencatat hasil akhir setelah update database
+            log.info("Request completed", 
+                kv("action", "UPDATE"), 
+                kv("status", "SUCCESS"), 
+                kv("id", id),
+                kv("result", updated)
+            );
             return ResponseEntity.ok(updated);
         } else {
             log.warn("Request completed", kv("action", "UPDATE"), kv("status", "NOT_FOUND"), kv("id", id));
